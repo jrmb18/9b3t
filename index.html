@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Nine tic tac toe boards in one. Where you play decides where your opponent plays next.">
+<style>:root{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Nine Board Tic Tac Toe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: play board on the left, the side board (map of the nine) on the right; stacks on phones. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --line: #c9d1da;
+  --ink: #18212b;
+  --muted: #5b6876;
+  --x: #d1495b;
+  --o: #2a7fbd;
+  --live: #f2c14e;
+  --live-soft: #fbefcd;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121820; --surface: #1b2430; --line: #334252; --ink: #e8edf2; --muted: #95a3b2;
+    --x: #f0707f; --o: #5fb0ea; --live: #f2c14e; --live-soft: #3a3320; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121820; --surface: #1b2430; --line: #334252; --ink: #e8edf2; --muted: #95a3b2;
+  --x: #f0707f; --o: #5fb0ea; --live: #f2c14e; --live-soft: #3a3320; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 40px;
+}
+.wrap { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header { display: flex; flex-direction: column; gap: 4px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 7vw, 40px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-family: var(--display); font-size: 18px; margin: 0; }
+.sub { color: var(--muted); margin: 0; font-size: 15px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+
+.status { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.turn { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; }
+.chip { font-family: var(--display); font-weight: 800; font-size: 22px; width: 36px; height: 36px; border-radius: 8px;
+  display: grid; place-items: center; color: #fff; flex: none; }
+.chip.X { background: var(--x); } .chip.O { background: var(--o); } .chip.D { background: var(--muted); }
+.where { color: var(--muted); font-size: 14px; font-weight: 400; }
+.score { display: flex; gap: 14px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.score b { color: var(--ink); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: start; }
+@media (max-width: 720px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.big { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; aspect-ratio: 1; max-width: 100%;
+  background: var(--ink); padding: 10px; border-radius: 14px; position: relative; }
+.small { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 4px;
+  background: var(--line); border-radius: 8px; transition: box-shadow .15s, background .15s; min-width: 0; }
+.small.live { background: var(--live); box-shadow: 0 0 0 3px var(--live); }
+.small.dim .cell { opacity: .55; }
+.cell { appearance: none; border: 0; margin: 0; padding: 0; background: var(--surface); border-radius: 4px;
+  font-family: var(--display); font-weight: 800; font-size: clamp(14px, 3.6vw, 26px); line-height: 1; color: var(--ink);
+  display: grid; place-items: center; cursor: default; min-width: 0; }
+.small.live .cell:not(.filled) { background: var(--live-soft); cursor: pointer; }
+.small.live .cell:not(.filled):hover { background: var(--surface); outline: 2px solid var(--live); outline-offset: -2px; }
+.cell:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+.cell.X { color: var(--x); } .cell.O { color: var(--o); }
+.cell.last { box-shadow: inset 0 0 0 2px currentColor; }
+.claim { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 8px; pointer-events: none;
+  font-family: var(--display); font-weight: 800; font-size: clamp(56px, 16vw, 130px); line-height: 1;
+  background: color-mix(in srgb, var(--surface) 78%, transparent); }
+.claim.X { color: var(--x); } .claim.O { color: var(--o); }
+.claim.T { color: var(--muted); font-size: clamp(14px, 3.4vw, 22px); letter-spacing: .08em; text-transform: uppercase; }
+.small.winline { box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--live); }
+
+/* Name entry, laid over the board until the game starts */
+.setup { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent); z-index: 2; }
+.setup form { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px;
+  width: min(340px, 100%); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.field .row { display: flex; gap: 8px; align-items: center; }
+.field input { flex: 1; min-width: 0; font: 500 16px var(--body); padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); }
+.field input:focus { outline: 2px solid var(--live); outline-offset: 1px; }
+.preview { font-family: var(--display); font-weight: 800; font-size: 20px; width: 38px; height: 38px; border-radius: 8px;
+  display: grid; place-items: center; color: #fff; flex: none; }
+.preview.X { background: var(--x); } .preview.O { background: var(--o); }
+.note { font-size: 13px; color: var(--muted); margin: 0; min-height: 1em; }
+
+/* Side board */
+.side { display: flex; flex-direction: column; gap: 12px; }
+.mapgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; aspect-ratio: 1; width: 100%; max-width: 260px;
+  margin: 0 auto; }
+.tile { display: grid; place-items: center; position: relative; min-width: 0; border-color: var(--ink); border-style: solid; border-width: 0; }
+.tile:nth-child(-n+6) { border-bottom-width: 3px; }
+.tile:not(:nth-child(3n)) { border-right-width: 3px; }
+.tile .won { font-family: var(--display); font-weight: 800; font-size: 52px; line-height: 1; }
+.tile .won.X { color: var(--x); } .tile .won.O { color: var(--o); }
+.tile .won.T { font-size: 13px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.tile .threats { display: flex; gap: 4px; }
+.tile .threat { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; opacity: .38; }
+.tile .threat.X { color: var(--x); } .tile .threat.O { color: var(--o); }
+.tile.active { background: var(--live-soft); }
+.tile.winline .won { text-decoration: underline; text-decoration-color: var(--live); text-decoration-thickness: 4px; }
+.legend { display: grid; gap: 6px; font-size: 13px; color: var(--muted); margin: 0; padding: 0; list-style: none; }
+.legend li { display: flex; gap: 8px; align-items: center; }
+.legend .sw { font-family: var(--display); font-weight: 800; font-size: 18px; width: 22px; text-align: center; color: var(--ink); }
+.legend .sw.faint { opacity: .38; }
+.legend .sw.box { width: 22px; height: 16px; background: var(--live-soft); border: 1px solid var(--live); border-radius: 3px; }
+
+.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 500 14px var(--body); padding: 9px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 14px var(--body);
+  padding: 9px 14px; border-radius: 10px; cursor: pointer; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg button:focus-visible, .btn:focus-visible { outline: 3px solid var(--live); outline-offset: 2px; }
+.spacer { flex: 1; }
+
+.rules ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 65ch; }
+.rules b { color: var(--ink); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Nine Board Tic Tac Toe</h1>
+    <p class="sub">Where you play inside a board decides which board your opponent plays in next.</p>
+  </header>
+
+  <div class="panel status" aria-live="polite">
+    <div class="turn"><span id="chip" class="chip X">X</span><div><div id="turnText">Enter your names to start</div><div id="whereText" class="where">Each player plays with the first letter of their name</div></div></div>
+    <div class="score"><span><span id="n1">Player 1</span> <b id="sx">0</b></span><span><span id="n2">Player 2</span> <b id="so">0</b></span></div>
+  </div>
+
+  <div class="layout">
+    <div class="main">
+      <div id="big" class="big" role="grid" aria-label="Nine tic tac toe boards">
+        <div id="setup" class="setup">
+          <form id="setupForm" autocomplete="off">
+            <h2>Who's playing?</h2>
+            <div class="field">
+              <label for="p1">Player 1 (goes first)</label>
+              <div class="row"><input id="p1" maxlength="20" placeholder="Name" required><span id="pv1" class="preview X">?</span></div>
+            </div>
+            <div class="field">
+              <label for="p2" id="p2label">Player 2</label>
+              <div class="row"><input id="p2" maxlength="20" placeholder="Name" required><span id="pv2" class="preview O">?</span></div>
+            </div>
+            <p id="setupNote" class="note"></p>
+            <button class="btn primary" type="submit">Start game</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Opponent">
+          <button id="mode2" type="button" aria-pressed="true">Two players</button>
+          <button id="modeAI" type="button" aria-pressed="false">Vs computer</button>
+        </div>
+        <span class="spacer"></span>
+        <button id="undo" class="btn" type="button">Undo</button>
+        <button id="rematch" class="btn" type="button">Rematch</button>
+        <button id="reset" class="btn primary" type="button">New players</button>
+      </div>
+    </div>
+
+    <aside class="panel side" aria-label="Side board">
+      <h2>Side board</h2>
+      <div id="map" class="mapgrid"></div>
+      <ul class="legend">
+        <li><span class="sw">A</span>Board won by that player</li>
+        <li><span class="sw faint">A</span>Two in a row: that player can win this board next move</li>
+        <li><span class="sw box"></span>Board the next move must go in</li>
+      </ul>
+    </aside>
+  </div>
+
+  <section class="panel rules">
+    <h2>How to play</h2>
+    <ol>
+      <li>Player 1 goes first and can play in <b>any square of any board</b>.</li>
+      <li>The square you pick sends your opponent to the <b>matching board</b>. Play the top right square of any board, and your opponent must play in the top right board.</li>
+      <li>Get three in a row on a small board to <b>win that board</b>. The side board shows it with your letter.</li>
+      <li>If you are sent to a board that is already won or full, you may <b>play in any open board</b>.</li>
+      <li>Win <b>three boards in a row</b> (across, down, or diagonal) to win the game.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const POS = ["top left","top middle","top right","middle left","center","middle right","bottom left","bottom middle","bottom right"];
+const $ = id => document.getElementById(id);
+// Internally the two sides are "X" (player 1) and "O" (player 2); P holds their names and letters.
+let S, P = null, vsAI = false, history = [], aiTimer = null;
+
+const L = side => (P ? P[side].letter : side);
+const N = side => (P ? P[side].name : (side === "X" ? "Player 1" : "Player 2"));
+
+function lettersFor(n1, n2) {
+  const a = (n1.match(/[A-Za-z0-9]/) || ["X"])[0].toUpperCase();
+  let b = (n2.match(/[A-Za-z0-9]/) || ["O"])[0].toUpperCase(), note = "";
+  if (a === b) {
+    const alt = [...n2.toUpperCase()].find(ch => /[A-Z0-9]/.test(ch) && ch !== a);
+    b = alt || (a === "O" ? "X" : "O");
+    note = "Both names start with " + a + ", so " + (n2 || "player 2") + " plays as " + b + ".";
+  }
+  return { a, b, note };
+}
+
+function fresh() {
+  return { cells: Array.from({length: 9}, () => Array(9).fill(null)), small: Array(9).fill(null),
+           turn: "X", active: null, winner: null, line: null, last: null };
+}
+function clone(s) { return JSON.parse(JSON.stringify(s)); }
+function lineWinner(arr) {
+  for (const l of LINES) { const [a,b,c] = l; if (arr[a] && arr[a] !== "T" && arr[a] === arr[b] && arr[a] === arr[c]) return { who: arr[a], line: l }; }
+  return null;
+}
+function legal(s) {
+  if (s.winner || !P) return [];
+  const out = [];
+  for (let b = 0; b < 9; b++) {
+    if (s.small[b] || (s.active !== null && s.active !== b)) continue;
+    for (let c = 0; c < 9; c++) if (!s.cells[b][c]) out.push([b, c]);
+  }
+  return out;
+}
+function apply(s, b, c) {
+  const n = clone(s);
+  n.cells[b][c] = n.turn; n.last = [b, c];
+  const w = lineWinner(n.cells[b]);
+  if (w) n.small[b] = w.who; else if (n.cells[b].every(Boolean)) n.small[b] = "T";
+  const W = lineWinner(n.small);
+  if (W) { n.winner = W.who; n.line = W.line; }
+  n.active = n.small[c] ? null : c;
+  n.turn = n.turn === "X" ? "O" : "X";
+  if (!n.winner && legalRaw(n).length === 0) n.winner = "draw";
+  return n;
+}
+function legalRaw(s) { const keep = P; P = P || {}; const m = legal(s); P = keep; return m; }
+
+// Two in a row with the third square open, on a board nobody has won yet.
+function canWinSmall(cells, who) {
+  for (const l of LINES) {
+    const v = l.map(i => cells[i]);
+    if (v.filter(x => x === who).length === 2 && v.includes(null)) return true;
+  }
+  return false;
+}
+
+/* Computer: a one-step look with rules of thumb. */
+function scoreMove(s, b, c) {
+  const me = s.turn, you = me === "X" ? "O" : "X";
+  const n = apply(s, b, c);
+  if (n.winner === me) return 1e6;
+  let sc = Math.random() * 3;
+  if (n.small[b] === me) {
+    sc += 120;
+    for (const l of LINES) if (l.includes(b) && l.filter(i => n.small[i] === me).length === 2 && l.some(i => !n.small[i])) sc += 60;
+  }
+  const blk = s.cells[b].slice(); blk[c] = you; if (lineWinner(blk)) sc += 70;
+  if (n.active === null) sc -= 45;
+  else if (canWinSmall(n.cells[n.active], you)) {
+    sc -= 90;
+    const t = n.small.slice(); t[n.active] = you; if (lineWinner(t)) sc -= 5000;
+  }
+  for (const [b2, c2] of legal(n)) { if (apply(n, b2, c2).winner === you) { sc -= 1e5; break; } }
+  sc += [3,2,3,2,4,2,3,2,3][c] + [3,2,3,2,5,2,3,2,3][b];
+  return sc;
+}
+function aiMove() {
+  const moves = legal(S); if (!moves.length) return;
+  let best = moves[0], bs = -Infinity;
+  for (const m of moves) { const v = scoreMove(S, m[0], m[1]); if (v > bs) { bs = v; best = m; } }
+  play(best[0], best[1]);
+}
+
+function play(b, c) {
+  history.push(clone(S));
+  S = apply(S, b, c);
+  render();
+  queueAI();
+}
+function queueAI() {
+  clearTimeout(aiTimer);
+  if (vsAI && P && S.turn === "O" && !S.winner) aiTimer = setTimeout(aiMove, 450);
+}
+
+function build() {
+  const big = $("big");
+  for (let b = 0; b < 9; b++) {
+    const sm = document.createElement("div"); sm.className = "small"; sm.id = "b" + b;
+    sm.setAttribute("role", "group"); sm.setAttribute("aria-label", POS[b] + " board");
+    for (let c = 0; c < 9; c++) {
+      const cell = document.createElement("button"); cell.type = "button"; cell.className = "cell"; cell.id = "c" + b + c;
+      cell.addEventListener("click", () => {
+        if (vsAI && S.turn === "O") return;
+        if (legal(S).some(([x, y]) => x === b && y === c)) play(b, c);
+      });
+      sm.appendChild(cell);
+    }
+    const cl = document.createElement("div"); cl.className = "claim"; cl.hidden = true; sm.appendChild(cl);
+    big.appendChild(sm);
+  }
+  const map = $("map");
+  for (let b = 0; b < 9; b++) {
+    const t = document.createElement("div"); t.className = "tile"; t.id = "t" + b; map.appendChild(t);
+  }
+}
+
+function render() {
+  const open = new Set(legal(S).map(m => m[0]));
+  for (let b = 0; b < 9; b++) {
+    const sm = $("b" + b);
+    sm.classList.toggle("live", open.has(b));
+    sm.classList.toggle("dim", P && !open.has(b) && !S.small[b] && !S.winner);
+    sm.classList.toggle("winline", !!(S.line && S.line.includes(b)));
+    for (let c = 0; c < 9; c++) {
+      const el = $("c" + b + c), v = S.cells[b][c];
+      el.textContent = v ? L(v) : ""; el.className = "cell" + (v ? " filled " + v : "");
+      if (S.last && S.last[0] === b && S.last[1] === c) el.classList.add("last");
+      el.setAttribute("aria-label", POS[c] + " square, " + POS[b] + " board, " + (v ? N(v) : "empty"));
+      el.disabled = !(open.has(b) && !v);
+    }
+    const cl = sm.querySelector(".claim"), w = S.small[b];
+    cl.hidden = !w; cl.className = "claim" + (w ? " " + w : ""); cl.textContent = w === "T" ? "Tied" : (w ? L(w) : "");
+
+    // Side board tile
+    const t = $("t" + b);
+    t.classList.toggle("active", open.has(b) && S.active === b);
+    t.classList.toggle("winline", !!(S.line && S.line.includes(b)));
+    if (w) {
+      t.innerHTML = '<span class="won ' + w + '">' + (w === "T" ? "Tied" : L(w)) + "</span>";
+      t.title = POS[b] + " board: " + (w === "T" ? "tied" : "won by " + N(w));
+    } else {
+      const who = ["X", "O"].filter(s => canWinSmall(S.cells[b], s));
+      t.innerHTML = who.length ? '<span class="threats">' + who.map(s => '<span class="threat ' + s + '">' + L(s) + "</span>").join("") + "</span>" : "";
+      t.title = POS[b] + " board: " + (who.length ? who.map(N).join(" and ") + " can win it next move" : "open");
+    }
+  }
+  $("n1").textContent = N("X"); $("n2").textContent = N("O");
+  $("sx").textContent = S.small.filter(x => x === "X").length;
+  $("so").textContent = S.small.filter(x => x === "O").length;
+
+  const chip = $("chip");
+  if (!P) {
+    chip.className = "chip X"; chip.textContent = "?";
+    $("turnText").textContent = "Enter your names to start";
+    $("whereText").textContent = "Each player plays with the first letter of their name";
+  } else if (S.winner === "draw") {
+    chip.className = "chip D"; chip.textContent = "=";
+    $("turnText").textContent = "Draw"; $("whereText").textContent = "No one got three boards in a row.";
+  } else if (S.winner) {
+    chip.className = "chip " + S.winner; chip.textContent = L(S.winner);
+    $("turnText").textContent = N(S.winner) + " wins the game";
+    $("whereText").textContent = "Three boards in a row.";
+  } else {
+    chip.className = "chip " + S.turn; chip.textContent = L(S.turn);
+    const thinking = vsAI && S.turn === "O";
+    $("turnText").textContent = thinking ? "The computer is thinking…" : N(S.turn) + "'s move";
+    $("whereText").textContent = S.active === null
+      ? (S.last ? "That board is closed, so play in any open board" : "Play anywhere")
+      : "Play in the " + POS[S.active] + " board";
+  }
+  $("undo").disabled = history.length === 0;
+  $("rematch").disabled = !P;
+  $("setup").hidden = !!P;
+}
+
+function syncSetup() {
+  const n1 = $("p1").value.trim(), n2 = vsAI ? "Computer" : $("p2").value.trim();
+  const { a, b, note } = lettersFor(n1, n2);
+  $("pv1").textContent = n1 ? a : "?";
+  $("pv2").textContent = n2 ? b : "?";
+  $("setupNote").textContent = n1 && n2 ? note : "";
+}
+function setMode(ai) {
+  vsAI = ai;
+  $("mode2").setAttribute("aria-pressed", String(!ai)); $("modeAI").setAttribute("aria-pressed", String(ai));
+  $("p2").disabled = ai; $("p2label").textContent = ai ? "Player 2 (the computer)" : "Player 2";
+  if (ai) $("p2").value = "Computer"; else if ($("p2").value === "Computer") $("p2").value = "";
+  if (P) { P.O = ai ? { name: "Computer", letter: lettersFor(P.X.name, "Computer").b } : null; }
+  if (P && !ai) { P = null; } // a new human opponent needs a name
+  newGame();
+  syncSetup();
+}
+function newGame() { clearTimeout(aiTimer); S = fresh(); history = []; render(); queueAI(); }
+
+function start(data) {
+  build();
+  S = data && data.S ? data.S : fresh();
+  history = data && data.history ? data.history : [];
+  P = data && data.P ? data.P : null;
+  vsAI = !!(data && data.vsAI);
+  $("mode2").setAttribute("aria-pressed", String(!vsAI)); $("modeAI").setAttribute("aria-pressed", String(vsAI));
+  $("mode2").onclick = () => setMode(false);
+  $("modeAI").onclick = () => setMode(true);
+  $("p1").addEventListener("input", syncSetup); $("p2").addEventListener("input", syncSetup);
+  $("setupForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const n1 = $("p1").value.trim(), n2 = vsAI ? "Computer" : $("p2").value.trim();
+    if (!n1 || !n2) { $("setupNote").textContent = "Enter a name for both players."; return; }
+    const { a, b } = lettersFor(n1, n2);
+    P = { X: { name: n1, letter: a }, O: { name: n2, letter: b } };
+    newGame();
+  });
+  $("rematch").onclick = newGame;
+  $("reset").onclick = () => { P = null; newGame(); setTimeout(() => $("p1").focus(), 0); };
+  $("undo").onclick = () => {
+    clearTimeout(aiTimer);
+    if (!history.length) return;
+    S = history.pop();
+    if (vsAI && S.turn === "O" && history.length) S = history.pop(); // undo the computer's reply too
+    render();
+    queueAI();
+  };
+  if (vsAI) { $("p2").disabled = true; $("p2").value = "Computer"; $("p2label").textContent = "Player 2 (the computer)"; }
+  syncSetup();
+  render();
+  queueAI();
+}
+start({});
+</script>
+</body>
+</html>
